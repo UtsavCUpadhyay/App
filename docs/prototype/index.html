@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurelle — Interactive Prototype</title>
+<style>
+  :root{
+    --bg:#0B0B0F; --surface:#16161C; --elevated:#1F1F28;
+    --gold:#C9A66B; --violet:#7C6FF0;
+    --text:#F5F3EE; --muted:#A8A6B3;
+    --safe:#4CAF7D; --alert:#D9695F;
+    --hairline:rgba(255,255,255,.08);
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(124,111,240,.10), transparent 60%),
+      radial-gradient(1000px 700px at 110% 20%, rgba(201,166,107,.10), transparent 55%),
+      #050507;
+    color:var(--text); font-family:var(--sans);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    gap:26px; padding:48px 20px 72px; -webkit-font-smoothing:antialiased;
+  }
+  .serif{font-family:var(--serif); letter-spacing:.2px}
+  .intro{max-width:420px; text-align:center}
+  .intro .mark{font-family:var(--serif); color:var(--gold); font-size:30px; letter-spacing:1px}
+  .intro p{color:var(--muted); font-size:14px; line-height:1.6; margin-top:10px}
+  .intro .tag{display:inline-block; margin-top:14px; font-size:11px; letter-spacing:1.4px;
+    text-transform:uppercase; color:var(--muted); border:1px solid var(--hairline);
+    padding:6px 12px; border-radius:999px}
+
+  /* Phone frame */
+  .phone{
+    width:390px; max-width:calc(100vw - 40px); height:820px;
+    background:var(--bg); border-radius:46px; border:9px solid #000;
+    box-shadow:0 40px 100px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04);
+    overflow:hidden; position:relative;
+  }
+  .notch{position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:150px; height:30px; background:#000; border-radius:0 0 18px 18px; z-index:40}
+  .screen{position:absolute; inset:0; display:none; flex-direction:column;
+    animation:fade .4s ease both}
+  .screen.active{display:flex}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:none}}
+  @media (prefers-reduced-motion:reduce){.screen{animation:none}}
+  .body{flex:1; overflow-y:auto; padding:56px 24px 20px; scrollbar-width:none}
+  .body::-webkit-scrollbar{display:none}
+
+  h1.title{font-family:var(--serif); font-size:28px; font-weight:600}
+  .sub{color:var(--muted); font-size:14px; line-height:1.5; margin-top:6px}
+
+  /* Progress */
+  .progress{display:flex; gap:5px; margin-bottom:26px}
+  .progress i{flex:1; height:4px; border-radius:2px; background:var(--elevated)}
+  .progress i.on{background:var(--gold)}
+
+  /* Verify steps */
+  .vstep{display:flex; align-items:center; gap:16px; padding:18px;
+    border:1px solid var(--hairline); border-radius:16px; background:var(--surface);
+    margin-top:14px; cursor:pointer; transition:border-color .3s, background .3s}
+  .vstep .ic{width:26px; text-align:center; color:var(--gold); font-size:19px}
+  .vstep b{font-size:15px; font-weight:600}
+  .vstep small{display:block; color:var(--muted); font-size:12.5px; margin-top:2px; line-height:1.4}
+  .vstep .chev{margin-left:auto; color:var(--muted); font-size:13px}
+  .vstep.done{border-color:var(--safe); background:rgba(76,175,125,.08)}
+  .vstep.done .ic,.vstep.done .chev{color:var(--safe)}
+  .why{display:flex; align-items:center; gap:10px; padding:14px 16px; margin-top:auto;
+    border:1px solid var(--hairline); border-radius:16px;
+    background:rgba(31,31,40,.6); backdrop-filter:blur(14px); color:var(--muted); font-size:12.5px}
+  .why .lock{color:var(--safe)}
+
+  /* Buttons */
+  .btn{display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; padding:16px; border-radius:16px; border:none; cursor:pointer;
+    font-family:var(--sans); font-size:15px; font-weight:600; letter-spacing:.2px}
+  .btn-gold{background:var(--gold); color:#0B0B0F}
+  .btn-gold:disabled{background:var(--elevated); color:var(--muted); cursor:not-allowed}
+  .btn-ghost{background:var(--surface); color:var(--muted); border:1px solid var(--hairline)}
+  .row{display:flex; gap:12px; margin-top:16px}
+
+  /* Top bar */
+  .topbar{position:absolute; top:0; left:0; right:0; height:96px; z-index:30;
+    display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 22px 12px; background:linear-gradient(var(--bg) 62%, transparent)}
+  .topbar .mark{font-family:var(--serif); color:var(--gold); font-size:21px; letter-spacing:.6px}
+  .seg{display:flex; gap:4px; background:var(--surface); border-radius:999px; padding:4px}
+  .seg button{border:none; background:none; color:var(--muted); font:inherit; font-size:13px;
+    font-weight:600; padding:6px 15px; border-radius:999px; cursor:pointer}
+  .seg button.on{background:var(--gold); color:#0B0B0F}
+  .iconbtn{width:38px; height:38px; border-radius:999px; border:1px solid var(--hairline);
+    background:var(--surface); color:var(--gold); font-size:17px; cursor:pointer}
+
+  /* Match card */
+  .match{position:relative; height:430px; border-radius:22px; overflow:hidden;
+    background:linear-gradient(135deg,#2b2733,#1a1820)}
+  .match .scrim{position:absolute; inset:0;
+    background:linear-gradient(transparent 42%, rgba(11,11,15,.96))}
+  .badge{position:absolute; top:16px; left:16px; display:flex; align-items:center; gap:6px;
+    padding:6px 12px; border-radius:999px; background:rgba(31,31,40,.55);
+    backdrop-filter:blur(12px); border:1px solid var(--hairline); font-size:11.5px;
+    font-weight:600; color:var(--safe)}
+  .seal{color:var(--gold); font-size:12px}
+  .match .info{position:absolute; left:22px; right:22px; bottom:22px}
+  .match .info h2{font-family:var(--serif); font-size:26px; font-weight:600}
+  .match .info p{color:var(--muted); font-size:13.5px; margin-top:4px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+  .chip{font-size:11.5px; padding:6px 12px; border-radius:999px; background:rgba(31,31,40,.55);
+    backdrop-filter:blur(12px); border:1px solid var(--hairline); color:var(--text)}
+  .chip.gold{color:var(--gold); font-weight:600}
+
+  /* Chat */
+  .chat-head{position:absolute; top:0; left:0; right:0; height:96px; z-index:30;
+    display:flex; align-items:flex-end; gap:10px; padding:0 18px 12px;
+    background:linear-gradient(var(--bg) 62%, transparent)}
+  .avatar{width:34px; height:34px; border-radius:999px; background:var(--elevated);
+    display:flex; align-items:center; justify-content:center; font-weight:600; font-size:14px}
+  .bub{max-width:74%; padding:12px 16px; font-size:14.5px; line-height:1.45; border-radius:16px}
+  .bub.them{background:var(--surface); border-bottom-left-radius:5px; align-self:flex-start}
+  .bub.me{background:var(--gold); color:#0B0B0F; border-bottom-right-radius:5px; align-self:flex-end}
+  .wave{display:flex; align-items:center; gap:3px}
+  .wave i{width:2.5px; border-radius:2px; background:rgba(11,11,15,.6)}
+  .safety-banner{align-self:flex-start; max-width:80%; display:flex; gap:9px; padding:12px;
+    border-radius:12px; background:rgba(217,105,95,.12); border:1px solid rgba(217,105,95,.4);
+    font-size:12.5px; line-height:1.4; color:var(--text)}
+  .safety-banner .ic{color:var(--alert)}
+  .composer{padding:12px 16px 18px; border-top:1px solid var(--hairline); background:var(--bg)}
+  .ice{display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);
+    background:var(--surface); border:1px solid var(--hairline); padding:7px 12px;
+    border-radius:999px; margin-bottom:10px; cursor:pointer}
+  .ice .sp{color:var(--violet)}
+  .composer .field{display:flex; align-items:center; gap:9px}
+  .composer input{flex:1; background:var(--surface); border:none; border-radius:999px;
+    padding:13px 16px; color:var(--text); font:inherit; font-size:14px}
+  .composer input::placeholder{color:var(--muted)}
+  .send{width:46px; height:46px; border-radius:999px; border:none; background:var(--gold);
+    color:#0B0B0F; font-size:18px; cursor:pointer; flex:none}
+
+  /* Advice */
+  .coach{display:flex; align-items:center; gap:15px; padding:18px; border-radius:20px;
+    background:linear-gradient(135deg,#2A2540,#1A1826); border:1px solid var(--hairline); margin-top:16px}
+  .coach .g{width:44px; height:44px; border-radius:14px; display:flex; align-items:center;
+    justify-content:center; background:rgba(124,111,240,.18); color:var(--violet); font-size:20px}
+  .coach b{font-size:15px} .coach small{display:block; color:var(--muted); font-size:12.5px; margin-top:2px}
+  .vfilters{display:flex; gap:8px; margin:20px 0 6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px}
+  .vfilters::-webkit-scrollbar{display:none}
+  .vpill{flex:none; font-size:12.5px; font-weight:600; padding:8px 15px; border-radius:999px;
+    background:rgba(31,31,40,.6); border:1px solid var(--hairline); color:var(--muted); cursor:pointer}
+  .vpill.on{background:var(--violet); color:#fff}
+  .feature{height:190px; border-radius:20px; padding:22px; margin-top:16px;
+    background:linear-gradient(135deg,#221F2E,#14131B); display:flex; flex-direction:column; justify-content:space-between}
+  .feature .cat{align-self:flex-start; font-size:11.5px; font-weight:600; color:var(--violet);
+    background:rgba(124,111,240,.14); padding:6px 12px; border-radius:999px}
+  .feature h3{font-family:var(--serif); font-size:20px; font-weight:600}
+  .feature small{color:var(--muted); font-size:12.5px; display:block; margin-top:6px}
+  .arow{display:flex; align-items:center; gap:12px; padding:16px; border-radius:16px;
+    background:var(--surface); margin-top:12px}
+  .arow .k{font-size:10.5px; letter-spacing:.8px; color:var(--violet); font-weight:700}
+  .arow b{display:block; font-size:14.5px; margin-top:4px} .arow small{color:var(--muted); font-size:12px}
+  .arow .bm{margin-left:auto; color:var(--muted)}
+
+  /* Account */
+  .profile{display:flex; align-items:center; gap:16px; margin-top:20px}
+  .profile .pic{width:56px; height:56px; border-radius:999px; background:var(--elevated)}
+  .premium{padding:22px; border-radius:20px; margin-top:22px;
+    background:linear-gradient(135deg,#2E2718,#191510); border:1px solid rgba(201,166,107,.35)}
+  .premium h3{font-family:var(--serif); font-size:19px} .premium small{color:var(--muted); font-size:12.5px; display:block; margin:6px 0 16px}
+  .section-label{font-size:10.5px; letter-spacing:1.2px; color:var(--muted); font-weight:700;
+    margin:26px 0 8px; text-transform:uppercase}
+  .list{background:var(--surface); border-radius:16px; overflow:hidden}
+  .li{display:flex; align-items:center; gap:14px; padding:15px 16px; border-bottom:1px solid var(--hairline); font-size:14.5px}
+  .li:last-child{border-bottom:none}
+  .li .ic{color:var(--gold); width:20px; text-align:center}
+  .li.danger .ic,.li.danger span{color:var(--alert)}
+  .li .chev{margin-left:auto; color:var(--muted); font-size:13px}
+
+  /* Empty state */
+  .empty{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px; color:var(--muted)}
+  .empty .big{font-size:34px}
+  .empty h3{font-family:var(--serif); color:var(--text); font-size:20px}
+
+  /* Tab bar */
+  .tabbar{display:flex; background:var(--surface); border-top:1px solid var(--hairline);
+    padding:10px 8px calc(10px + env(safe-area-inset-bottom))}
+  .tab{flex:1; background:none; border:none; cursor:pointer; color:var(--muted);
+    display:flex; flex-direction:column; align-items:center; gap:4px; font:inherit; font-size:10.5px; font-weight:600}
+  .tab .g{font-size:20px}
+  .tab.on{color:var(--gold)}
+  .tab.on.violet{color:var(--violet)}
+
+  /* Safety sheet */
+  .sheet-wrap{position:absolute; inset:0; z-index:50; display:none}
+  .sheet-wrap.open{display:block}
+  .scrim-bg{position:absolute; inset:0; background:rgba(0,0,0,.5); animation:fade .3s ease}
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:var(--surface);
+    border-radius:22px 22px 0 0; padding:14px 24px calc(28px + env(safe-area-inset-bottom));
+    animation:slideup .35s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes slideup{from{transform:translateY(100%)}to{transform:none}}
+  .grab{width:38px; height:4px; border-radius:2px; background:var(--elevated); margin:0 auto 16px}
+  .sheet h2{font-family:var(--serif); font-size:23px} .sheet .sub{margin-bottom:18px}
+  .saction{display:flex; align-items:center; gap:14px; padding:16px; border-radius:16px;
+    background:var(--elevated); margin-top:11px; cursor:pointer}
+  .saction .ic{font-size:19px; color:var(--gold)} .saction b{font-size:14.5px}
+  .saction small{display:block; color:var(--muted); font-size:12px; margin-top:2px}
+  .saction .chev{margin-left:auto; color:var(--muted)}
+  .saction.alert{background:rgba(217,105,95,.10)} .saction.alert .ic,.saction.alert b{color:var(--alert)}
+
+  .hint{color:var(--muted); font-size:12px; text-align:center; max-width:390px; line-height:1.6}
+  .hint b{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <div class="mark serif">Aurelle</div>
+  <p>Interactive prototype of the flagship screens, in the real design system. Verified-first, curated, dark-native. Tap through it.</p>
+  <span class="tag">Prototype · mock data</span>
+</div>
+
+<div class="phone" id="phone">
+  <div class="notch"></div>
+
+  <!-- SCREEN: VERIFICATION -->
+  <section class="screen active" data-screen="verify">
+    <div class="body">
+      <div class="progress"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+      <h1 class="title">Let’s verify it’s really you</h1>
+      <p class="sub">Every Aurelle member is identity-verified. A one-time step that keeps this a space free of fakes, bots and catfish — the reason you’re here.</p>
+
+      <div class="vstep" id="step-id" onclick="doStep(this,'id')">
+        <span class="ic">▣</span>
+        <div><b>Scan government ID</b><small>Encrypted, stored separately, never on your profile</small></div>
+        <span class="chev">›</span>
+      </div>
+      <div class="vstep" id="step-selfie" onclick="doStep(this,'selfie')">
+        <span class="ic">◕</span>
+        <div><b>Take a liveness selfie</b><small>Confirms you’re a real person, in real time</small></div>
+        <span class="chev">›</span>
+      </div>
+
+      <div class="why"><span class="lock">🔒</span><span>Why we verify — and how your data is protected</span><span style="margin-left:auto;color:var(--muted)">›</span></div>
+      <button class="btn btn-gold" id="verify-cta" style="margin-top:16px" disabled onclick="go('home')">Complete both steps</button>
+    </div>
+  </section>
+
+  <!-- SCREEN: HOME / MATCHES -->
+  <section class="screen" data-screen="home">
+    <div class="topbar">
+      <span class="mark">Aurelle</span>
+      <div class="seg"><button class="on">Dating</button><button onclick="go('advice')">Advice</button></div>
+      <button class="iconbtn" title="Safety Center" onclick="openSheet()">⛨</button>
+    </div>
+    <div class="body">
+      <h1 class="title">Today’s Matches</h1>
+      <p class="sub">3 curated for you, based on compatibility</p>
+      <div class="match" style="margin-top:20px" onclick="go('chat')">
+        <div class="scrim"></div>
+        <div class="badge"><span class="seal">✦</span> Verified</div>
+        <div class="info">
+          <h2>Charlotte, 29</h2>
+          <p>Sydney · Design Director</p>
+          <div class="chips"><span class="chip gold">92% compatible</span><span class="chip">Shared values</span></div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost">View Profile</button>
+        <button class="btn btn-gold" onclick="go('chat')">Say Hello</button>
+      </div>
+      <p class="sub" style="text-align:center; margin-top:22px; opacity:.7">Curated, never endless — swipe fatigue by design is not our thing.</p>
+    </div>
+    <nav class="tabbar" data-tabs>
+      <button class="tab on" onclick="go('home')"><span class="g">♥</span>Dating</button>
+      <button class="tab" onclick="go('advice')"><span class="g">❏</span>Advice</button>
+      <button class="tab" onclick="go('alerts')"><span class="g">◔</span>Alerts</button>
+      <button class="tab" onclick="go('account')"><span class="g">◑</span>Account</button>
+    </nav>
+    <div class="sheet-wrap" id="sheet">
+      <div class="scrim-bg" onclick="closeSheet()"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <h2>Safety Center</h2>
+        <p class="sub">Your safety is always one tap away.</p>
+        <div class="saction alert"><span class="ic">⚑</span><div><b>Emergency — share my location</b><small>Alerts your emergency contact with live location</small></div><span class="chev">›</span></div>
+        <div class="saction"><span class="ic">⚐</span><div><b>Report a user</b><small>Human-reviewed, urgent cases &lt; 2 hours</small></div><span class="chev">›</span></div>
+        <div class="saction"><span class="ic">⊘</span><div><b>Block a user</b><small>They can no longer see you or message you</small></div><span class="chev">›</span></div>
+        <div class="saction"><span class="ic">◈</span><div><b>Share my date details</b><small>Send who, where and when to a trusted contact</small></div><span class="chev">›</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCREEN: CHAT -->
+  <section class="screen" data-screen="chat">
+    <div class="chat-head">
+      <button class="iconbtn" style="border:none;background:none;color:var(--gold);width:auto;font-size:22px" onclick="go('home')">‹</button>
+      <div class="avatar">C</div>
+      <div><b style="font-family:var(--serif);font-size:17px">Charlotte</b> <span class="seal">✦</span></div>
+      <button class="iconbtn" style="margin-left:auto" title="Safety Center" onclick="go('home');setTimeout(openSheet,120)">⛨</button>
+    </div>
+    <div class="body" style="display:flex;flex-direction:column;gap:8px;padding-top:104px" id="thread">
+      <div class="bub them">Hi! Your profile mentioned you love the coast — favourite beach?</div>
+      <div class="bub me">Tamarama on a quiet morning. You?</div>
+      <div class="bub them"><span class="wave" id="wave"></span></div>
+      <div class="bub them">This is lovely — could you help me out with a $200 transfer today?</div>
+      <div class="safety-banner"><span class="ic">ⓘ</span><span>This message mentions sending money. Aurelle members never ask for transfers — be cautious and consider reporting.</span></div>
+    </div>
+    <div class="composer">
+      <span class="ice" onclick="fillIce()"><span class="sp">✦</span> Suggest an icebreaker</span>
+      <div class="field">
+        <input id="msg" placeholder="Message" />
+        <button class="send" onclick="sendMsg()">↑</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCREEN: ADVICE -->
+  <section class="screen" data-screen="advice">
+    <div class="topbar">
+      <span class="mark" style="color:var(--violet)">Aurelle</span>
+      <div class="seg"><button onclick="go('home')">Dating</button><button class="on" style="background:var(--violet);color:#fff">Advice</button></div>
+      <span style="width:38px"></span>
+    </div>
+    <div class="body">
+      <h1 class="title">Advice</h1>
+      <p class="sub">Evidence-based guidance. Private from your dating profile.</p>
+      <div class="coach"><span class="g">✦</span><div><b>Ask the AI Coach</b><small>Judgment-free, evidence-based answers</small></div><span style="margin-left:auto;color:var(--muted)">›</span></div>
+      <div class="vfilters">
+        <span class="vpill on">For You</span><span class="vpill">Men</span><span class="vpill">Women</span><span class="vpill">LGBTQ+</span><span class="vpill">Life Stage</span>
+      </div>
+      <div class="feature">
+        <span class="cat">Attachment</span>
+        <div><h3>How to spot secure vs. anxious attachment early</h3><small>6 min read</small></div>
+      </div>
+      <div class="arow"><div><span class="k">LIFE STAGE</span><b>Dating again after divorce: the first 30 days</b><small>8 min read</small></div><span class="bm">⤓</span></div>
+      <div class="arow"><div><span class="k">COMMUNICATION</span><b>Communicating boundaries without conflict</b><small>5 min read</small></div><span class="bm">⤓</span></div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" onclick="go('home')"><span class="g">♥</span>Dating</button>
+      <button class="tab on violet" onclick="go('advice')"><span class="g">❏</span>Advice</button>
+      <button class="tab" onclick="go('alerts')"><span class="g">◔</span>Alerts</button>
+      <button class="tab" onclick="go('account')"><span class="g">◑</span>Account</button>
+    </nav>
+  </section>
+
+  <!-- SCREEN: ALERTS -->
+  <section class="screen" data-screen="alerts">
+    <div class="topbar"><span class="mark">Aurelle</span><span></span><span style="width:38px"></span></div>
+    <div class="body" style="padding-top:96px">
+      <div class="empty"><span class="big">◔</span><h3>You’re all caught up</h3><p>New matches and messages will appear here.</p></div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" onclick="go('home')"><span class="g">♥</span>Dating</button>
+      <button class="tab" onclick="go('advice')"><span class="g">❏</span>Advice</button>
+      <button class="tab on" onclick="go('alerts')"><span class="g">◔</span>Alerts</button>
+      <button class="tab" onclick="go('account')"><span class="g">◑</span>Account</button>
+    </nav>
+  </section>
+
+  <!-- SCREEN: ACCOUNT -->
+  <section class="screen" data-screen="account">
+    <div class="topbar"><span class="mark">Aurelle</span><span></span><span style="width:38px"></span></div>
+    <div class="body" style="padding-top:96px">
+      <h1 class="title">Account</h1>
+      <div class="profile"><div class="pic"></div><div><b style="font-family:var(--serif);font-size:19px">Alex Morgan</b><div class="badge" style="position:static;margin-top:6px;display:inline-flex"><span class="seal">✦</span> Verified</div></div></div>
+      <div class="premium"><h3>Aurelle Premium</h3><small>Unlimited AI coach, deeper compatibility insights, incognito.</small><button class="btn btn-gold">See plans</button></div>
+      <div class="section-label">Privacy & safety</div>
+      <div class="list">
+        <div class="li"><span class="ic">◍</span><span>Incognito & visibility</span><span class="chev">›</span></div>
+        <div class="li"><span class="ic">◎</span><span>Location sharing (suburb-level)</span><span class="chev">›</span></div>
+        <div class="li"><span class="ic">⚿</span><span>Biometric app lock</span><span class="chev">›</span></div>
+      </div>
+      <div class="section-label">Your data</div>
+      <div class="list">
+        <div class="li"><span class="ic">⤓</span><span>Export my data</span><span class="chev">›</span></div>
+        <div class="li danger"><span class="ic">⌫</span><span>Delete my account</span><span class="chev">›</span></div>
+      </div>
+    </div>
+    <nav class="tabbar">
+      <button class="tab" onclick="go('home')"><span class="g">♥</span>Dating</button>
+      <button class="tab" onclick="go('advice')"><span class="g">❏</span>Advice</button>
+      <button class="tab" onclick="go('alerts')"><span class="g">◔</span>Alerts</button>
+      <button class="tab on" onclick="go('account')"><span class="g">◑</span>Account</button>
+    </nav>
+  </section>
+</div>
+
+<p class="hint">Flow: <b>verify both steps</b> → curated match → tap a match to open <b>chat</b> (note the contextual safety banner) → tap the <b>⛨ shield</b> for the Safety Center. Faithful to the Aurelle design system — champagne gold on charcoal, dark-native, restraint over decoration.</p>
+
+<script>
+  const steps = {id:false, selfie:false};
+  function doStep(el, key){
+    steps[key] = true;
+    el.classList.add('done');
+    el.querySelector('.chev').textContent = '✓';
+    if(steps.id && steps.selfie){
+      const cta = document.getElementById('verify-cta');
+      cta.disabled = false;
+      cta.textContent = 'Continue';
+    }
+  }
+  function go(name){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = document.querySelector('[data-screen="'+name+'"]');
+    if(el){ el.classList.add('active'); el.querySelector('.body').scrollTop = 0; }
+  }
+  function openSheet(){ document.getElementById('sheet').classList.add('open'); }
+  function closeSheet(){ document.getElementById('sheet').classList.remove('open'); }
+  function fillIce(){ document.getElementById('msg').value = 'What’s the best thing you’ve read or listened to lately?'; }
+  function sendMsg(){
+    const i = document.getElementById('msg'); const t = i.value.trim(); if(!t) return;
+    const b = document.createElement('div'); b.className = 'bub me'; b.textContent = t;
+    const thread = document.getElementById('thread'); thread.appendChild(b);
+    i.value = ''; thread.scrollTop = thread.scrollHeight;
+  }
+  // Build the voice-note waveform
+  const heights = [8,14,20,12,22,10,18,24,12,16,9,20,13,7,17,11];
+  document.getElementById('wave').innerHTML = heights.map(h => '<i style="height:'+h+'px"></i>').join('') + '<span style="margin-left:8px;font-size:11px;color:rgba(11,11,15,.6)">0:12</span>';
+</script>
+</body>
+</html>
