@@ -29,6 +29,17 @@ flutter analyze      # lints (analysis_options.yaml)
 
 Requires Flutter ≥ 3.27 / Dart ≥ 3.6.
 
+## Backend API
+
+A runnable, tested backend lives in [`backend/`](backend/) — a Fastify + TypeScript modular monolith
+(Phase 15) that enforces the **hard verification gate server-side** (verify before browsing), the
+18+ age gate, and age-tiered Advice. It runs with no database (in-memory repositories behind the same
+interfaces a Postgres layer will implement) and ships 11 passing integration tests.
+
+```bash
+cd backend && npm install && npm test && npm start
+```
+
 ## Architecture at a glance
 
 Feature-first, Riverpod for state/DI, repository pattern (Phase 14). Full write-up in
@@ -53,8 +64,11 @@ lib/
 ## Documentation
 
 - [`AUDIT.md`](AUDIT.md) — project audit, plan strengths, gaps & risks
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture & conventions
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — client architecture & conventions
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — honest build sequence from here to launch
+- [`docs/adr/`](docs/adr/) — architecture decision records (e.g. Fastify vs. NestJS)
+- [`docs/launch/`](docs/launch/) — App Store / Play dating-app compliance checklist
+- [`docs/legal/`](docs/legal/) — privacy policy & terms draft templates (need legal review)
 - [`docs/planning/`](docs/planning/) — the full 25-phase product/strategy package
 
 ## License

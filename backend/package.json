@@ -1,0 +1,30 @@
+{
+  "name": "aurelle-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aurelle API — Phase 15 modular monolith (Fastify + TypeScript).",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@fastify/jwt": "^8.0.1",
+    "bcryptjs": "^2.4.3",
+    "fastify": "^4.29.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.20.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
