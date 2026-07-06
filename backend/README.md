@@ -13,10 +13,24 @@ The Aurelle backend — a **modular monolith** (Phase 15) in **Fastify + TypeScr
 
 ```bash
 npm install
-npm start          # boots on :3000 (PORT/HOST/JWT_SECRET via env)
+npm start          # boots on :3000 (config via env; see .env.example)
 npm run typecheck  # tsc --noEmit, strict
-npm test           # vitest — 11 integration tests via fastify.inject (no DB, no network)
+npm test           # vitest via fastify.inject (no network)
 ```
+
+**Storage is pluggable.** With no `DATABASE_URL`, the API uses in-memory repositories — zero setup,
+instant run, 11 passing integration tests. Point it at Postgres and it uses the real schema instead:
+
+```bash
+export DATABASE_URL="postgresql://user:pass@localhost:5432/aurelle"
+npm run seed       # applies migrations (migrations/NNNN_*.sql) + dev seed data
+npm start          # migrations run automatically on boot; seed does not
+npm test           # now also runs the 3 Postgres-backed tests (14 total)
+```
+
+Migrations live in [`migrations/`](migrations/) and implement the Phase 8 schema (users, isolated
+`verification_records`, profiles, compatibility answers, matches, advice, append-only `audit_log`),
+with indexes on the hot query paths and Row-Level Security enabled as the enforcement seam.
 
 ## What works today
 
@@ -38,7 +52,8 @@ npm test           # vitest — 11 integration tests via fastify.inject (no DB, 
 src/
 ├── config.ts                 # env-driven config; secrets never in source
 ├── domain/                   # entities (Phase 8 schema) + repository interfaces
-├── infra/memory/             # in-memory repositories (swap for Postgres via the same seam)
+├── infra/memory/             # in-memory repositories (default; zero-setup)
+├── infra/pg/                 # Postgres pool, migration runner + repositories
 ├── plugins/auth.ts           # JWT + `authenticate` and `requireVerified` guards
 ├── modules/
 │   ├── auth/                 # register / login / refresh / me
@@ -52,10 +67,10 @@ src/
 
 ## The seam to production
 
-Every module depends on a repository *interface*, never a concrete store. To go live, implement
-those interfaces against Postgres (Phase 8 schema, Sydney region, Row-Level Security) and pass them
-to `buildApp({ repos })`. No module logic changes. The same seam is why the whole API is testable
-today with zero external dependencies.
+Every module depends on a repository *interface*, never a concrete store. Both an in-memory and a
+**Postgres** implementation exist behind that seam; `buildApp({ repos })` picks whichever is passed.
+That is why the whole API is testable with zero dependencies *and* runs on the real Phase 8 schema
+with one env var. Production adds Row-Level Security policies, a Sydney region, and TLS.
 
 ## Not yet built (see ../docs/ROADMAP.md)
 

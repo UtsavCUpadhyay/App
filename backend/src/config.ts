@@ -11,6 +11,8 @@ export interface AppConfig {
   refreshTokenTtl: string;
   /** Minimum age for any Dating functionality (Phase 2 hard age gate). */
   minDatingAge: number;
+  /** Postgres connection string. When unset, the app uses in-memory storage. */
+  databaseUrl: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -25,5 +27,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     accessTokenTtl: env.ACCESS_TOKEN_TTL ?? '15m',
     refreshTokenTtl: env.REFRESH_TOKEN_TTL ?? '30d',
     minDatingAge: 18,
+    databaseUrl: env.DATABASE_URL,
   };
 }

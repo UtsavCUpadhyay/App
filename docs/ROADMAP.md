@@ -21,9 +21,12 @@ team-weeks, not guarantees.
 - ✅ **Started (`backend/`):** modular monolith (Fastify + TS — see ADR 0001), auth (register/login/
   refresh, bcrypt + JWT), hard age gate, **hard verification gate enforced server-side**, verification
   vendor-callback simulation, age-tiered Advice. 11 passing integration tests, runs with no DB.
-- Next: Postgres in Sydney region + schema per Phase 8 + Row-Level Security; swap the in-memory
-  repositories for Postgres-backed ones behind the existing interfaces; passkey login; MFA for billing
-  changes; rate limiting; dependency/vuln scanning in CI.
+- ✅ **Postgres wired in:** Phase 8 schema as SQL migrations (users, isolated verification_records,
+  profiles, compatibility answers, matches, advice, append-only audit_log; hot-path indexes; RLS
+  enabled), a migration runner + dev seed, and Postgres-backed repositories behind the same
+  interfaces. The API runs on either store via `DATABASE_URL`; 14 tests pass (3 against real Postgres).
+- Next: RLS *policies* per role; passkey login; MFA for billing changes; rate limiting;
+  dependency/vuln scanning in CI; move curation out of the match repo into a real scoring service.
 
 ## Stage 3 — Verification + trust (3–4 wks)
 - Integrate a licensed vendor (Onfido/Jumio/iDenfy/Persona-class) — store reference tokens only.
