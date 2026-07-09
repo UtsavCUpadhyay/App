@@ -45,6 +45,11 @@ with indexes on the hot query paths and Row-Level Security enabled as the enforc
   routes to **manual review** rather than auto-rejecting.
 - **Advice** — age-tiered server-side: under-18 accounts only ever receive minor-safe content
   (Phase 16), not just a hidden UI filter.
+- **Chat + AI safety moderation** — 1:1 conversations + messages (gated: verified members only,
+  participant-authorized). Every text message is scanned by a moderation provider **before storage**
+  (Phase 10); scam/abuse patterns are flagged with a user-facing reason (the contextual safety
+  banner) and still delivered — we flag, never auto-block. The rules-based provider is swappable for
+  a hosted-LLM one (Phase 16) behind one interface.
 
 ## Structure (module boundaries mirror the Phase 15 plan)
 
@@ -59,7 +64,9 @@ src/
 │   ├── auth/                 # register / login / refresh / me
 │   ├── verification/         # vendor-callback simulation, status
 │   ├── matching/             # curated daily matches (gated)
-│   └── advice/               # age-tiered content
+│   ├── advice/               # age-tiered content
+│   ├── chat/                 # conversations + messages (gated, moderated)
+│   └── moderation/           # scam/abuse scan provider (swappable for an LLM)
 ├── shared/http-error.ts
 ├── app.ts                    # composition root (buildApp)
 └── server.ts                 # process entry + graceful shutdown

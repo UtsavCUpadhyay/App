@@ -34,10 +34,13 @@ team-weeks, not guarantees.
 - Admin verification/moderation queue (separate web app — never in the mobile binary).
 
 ## Stage 4 — Messaging + safety (4–6 wks)
-- WebSocket gateway + Redis pub/sub (chat delivery < 500ms p95); encrypt-at-rest.
-- Server-side AI scam/abuse moderation _before_ storage; image NCII/CSAM detection (legal
-  requirement before enabling photo messaging); voice-note transcription+scan or descope voice.
-- Report/block with < 24h (urgent < 2h) resolution SLA wired to the admin queue.
+- ✅ **Started:** 1:1 conversations + messages (Phase 8 `0002_chat.sql`), gated to verified members
+  and participant-authorized; **server-side scam/abuse moderation _before_ storage** with a swappable
+  provider (rules now → hosted LLM per Phase 16), flag-not-block, contextual safety-banner reason
+  persisted per message. Verified live over HTTP + at the SQL layer (7 chat/moderation tests).
+- Next: WebSocket gateway + Redis pub/sub for real-time delivery (< 500ms p95); encrypt-at-rest;
+  image NCII/CSAM detection before enabling photo messaging; voice-note transcription+scan or descope
+  voice; report/block wired to the admin moderation queue with the < 24h (urgent < 2h) SLA.
 
 ## Stage 5 — Advice + AI + billing (3–5 wks)
 - Advice CMS + content; guardrailed AI Coach (hosted LLM, no-training terms) with **Australian**

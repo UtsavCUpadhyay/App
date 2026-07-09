@@ -1,5 +1,6 @@
 import type {
   AdviceRepository,
+  ChatRepository,
   MatchRepository,
   ProfileRepository,
   Repositories,
@@ -8,7 +9,10 @@ import type {
 } from '../../domain/repositories.js';
 import type {
   AdviceArticle,
+  ChatMessage,
+  Conversation,
   Match,
+  ModerationCategory,
   Profile,
   User,
   VerificationRecord,
@@ -245,6 +249,115 @@ class PgAdviceRepository implements AdviceRepository {
   }
 }
 
+class PgChatRepository implements ChatRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async findOrCreateConversation(userA: string, userB: string): Promise<Conversation> {
+    const pair = [userA, userB].sort();
+    // Exact-participant-set match (only 1:1 conversations exist here).
+    const found = await this.pool.query<{ conversation_id: string; created_at: Date | string }>(
+      `SELECT cp.conversation_id, c.created_at
+         FROM conversation_participants cp
+         JOIN conversations c ON c.id = cp.conversation_id
+        GROUP BY cp.conversation_id, c.created_at
+       HAVING array_agg(cp.user_id ORDER BY cp.user_id) = $1::uuid[]`,
+      [pair],
+    );
+    if (found.rows[0]) {
+      return {
+        id: found.rows[0].conversation_id,
+        participantIds: pair,
+        createdAt: isoDate(found.rows[0].created_at),
+      };
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query<{ id: string; created_at: Date | string }>(
+        'INSERT INTO conversations DEFAULT VALUES RETURNING id, created_at',
+      );
+      const convoId = rows[0]!.id;
+      await client.query(
+        `INSERT INTO conversation_participants (conversation_id, user_id)
+         VALUES ($1,$2), ($1,$3)`,
+        [convoId, pair[0], pair[1]],
+      );
+      await client.query('COMMIT');
+      return { id: convoId, participantIds: pair, createdAt: isoDate(rows[0]!.created_at) };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getConversation(conversationId: string): Promise<Conversation | null> {
+    const { rows } = await this.pool.query<{ created_at: Date | string; user_id: string }>(
+      `SELECT c.created_at, cp.user_id
+         FROM conversations c
+         JOIN conversation_participants cp ON cp.conversation_id = c.id
+        WHERE c.id = $1`,
+      [conversationId],
+    );
+    if (rows.length === 0) return null;
+    return {
+      id: conversationId,
+      participantIds: rows.map((r) => r.user_id),
+      createdAt: isoDate(rows[0]!.created_at),
+    };
+  }
+
+  async listConversations(userId: string): Promise<Conversation[]> {
+    const { rows } = await this.pool.query<{ id: string; created_at: Date | string }>(
+      `SELECT c.id, c.created_at
+         FROM conversations c
+         JOIN conversation_participants cp ON cp.conversation_id = c.id
+        WHERE cp.user_id = $1
+        ORDER BY c.created_at DESC`,
+      [userId],
+    );
+    const out: Conversation[] = [];
+    for (const r of rows) {
+      const convo = await this.getConversation(r.id);
+      if (convo) out.push(convo);
+    }
+    return out;
+  }
+
+  async addMessage(m: ChatMessage): Promise<ChatMessage> {
+    await this.pool.query(
+      `INSERT INTO messages
+         (id, conversation_id, sender_id, kind, body, moderation_flag, moderation_category, moderation_reason, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [m.id, m.conversationId, m.senderId, m.kind, m.body,
+        m.moderation.flagged, m.moderation.category, m.moderation.reason, m.createdAt],
+    );
+    return m;
+  }
+
+  async getMessages(conversationId: string): Promise<ChatMessage[]> {
+    const { rows } = await this.pool.query(
+      `SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+      [conversationId],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      conversationId: r.conversation_id,
+      senderId: r.sender_id,
+      kind: r.kind,
+      body: r.body,
+      moderation: {
+        flagged: r.moderation_flag,
+        category: r.moderation_category as ModerationCategory,
+        reason: r.moderation_reason,
+      },
+      createdAt: isoDate(r.created_at),
+    }));
+  }
+}
+
 export function createPgRepositories(pool: Pool): Repositories {
   return {
     users: new PgUserRepository(pool),
@@ -252,5 +365,6 @@ export function createPgRepositories(pool: Pool): Repositories {
     profiles: new PgProfileRepository(pool),
     matches: new PgMatchRepository(pool),
     advice: new PgAdviceRepository(pool),
+    chat: new PgChatRepository(pool),
   };
 }

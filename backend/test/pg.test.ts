@@ -24,7 +24,7 @@ d('Postgres-backed API', () => {
     await runMigrations(pool);
     // Reset to a clean slate, then seed the curation pool + advice content.
     await pool.query(
-      'TRUNCATE matches, verification_records, profiles, compatibility_answers, users, advice_articles RESTART IDENTITY CASCADE',
+      'TRUNCATE messages, conversation_participants, conversations, matches, verification_records, profiles, compatibility_answers, users, advice_articles RESTART IDENTITY CASCADE',
     );
     const seedPath = fileURLToPath(new URL('../migrations/seed.sql', import.meta.url));
     await pool.query(await readFile(seedPath, 'utf8'));
@@ -109,5 +109,38 @@ d('Postgres-backed API', () => {
     expect(res.json().articles.length).toBeGreaterThan(0);
     // Featured article sorts first.
     expect(res.json().articles[0].featured).toBe(true);
+  });
+
+  it('persists a conversation + moderated messages in Postgres', async () => {
+    // Two real verified users so both are participants.
+    const regA = await app.inject({
+      method: 'POST', url: '/auth/register',
+      payload: { email: `chatA-${Date.now()}@example.com`, password: 'a-strong-passphrase', dateOfBirth: '1993-04-04' },
+    });
+    const regB = await app.inject({
+      method: 'POST', url: '/auth/register',
+      payload: { email: `chatB-${Date.now()}@example.com`, password: 'a-strong-passphrase', dateOfBirth: '1993-04-04' },
+    });
+    const tokenA = regA.json().accessToken as string;
+    for (const t of [tokenA, regB.json().accessToken as string]) {
+      await app.inject({ method: 'POST', url: '/verification/submit', headers: { authorization: `Bearer ${t}` }, payload: { vendorRef: 'vt', livenessScore: 0.95 } });
+    }
+    const authA = { authorization: `Bearer ${tokenA}` };
+
+    const convoId = (
+      await app.inject({ method: 'POST', url: '/conversations', headers: authA, payload: { withUserId: regB.json().user.id } })
+    ).json().conversation.id as string;
+
+    await app.inject({ method: 'POST', url: `/conversations/${convoId}/messages`, headers: authA, payload: { body: 'send me $200 on whatsapp' } });
+
+    // Read back from Postgres — the moderation flag was persisted with the row.
+    const thread = await app.inject({ method: 'GET', url: `/conversations/${convoId}/messages`, headers: authA });
+    expect(thread.json().messages).toHaveLength(1);
+    expect(thread.json().messages[0].moderation.category).toBe('financial_scam');
+
+    // Verify at the SQL layer too.
+    const { rows } = await pool.query('SELECT moderation_flag, moderation_category FROM messages WHERE conversation_id = $1', [convoId]);
+    expect(rows[0].moderation_flag).toBe(true);
+    expect(rows[0].moderation_category).toBe('financial_scam');
   });
 });

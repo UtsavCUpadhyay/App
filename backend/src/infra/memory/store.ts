@@ -1,5 +1,8 @@
+import { randomUUID } from 'node:crypto';
+
 import type {
   AdviceRepository,
+  ChatRepository,
   MatchRepository,
   ProfileRepository,
   Repositories,
@@ -8,6 +11,8 @@ import type {
 } from '../../domain/repositories.js';
 import type {
   AdviceArticle,
+  ChatMessage,
+  Conversation,
   Match,
   Profile,
   User,
@@ -113,6 +118,53 @@ class MemoryAdviceRepository implements AdviceRepository {
   }
 }
 
+class MemoryChatRepository implements ChatRepository {
+  private conversations = new Map<string, Conversation>();
+  private messages = new Map<string, ChatMessage[]>();
+
+  private key(a: string, b: string): string {
+    return [a, b].sort().join(':');
+  }
+
+  async findOrCreateConversation(userA: string, userB: string): Promise<Conversation> {
+    const key = this.key(userA, userB);
+    const existing = [...this.conversations.values()].find(
+      (c) => this.key(c.participantIds[0]!, c.participantIds[1]!) === key,
+    );
+    if (existing) return existing;
+
+    const convo: Conversation = {
+      id: randomUUID(),
+      participantIds: [userA, userB],
+      createdAt: new Date().toISOString(),
+    };
+    this.conversations.set(convo.id, convo);
+    this.messages.set(convo.id, []);
+    return convo;
+  }
+
+  async getConversation(conversationId: string): Promise<Conversation | null> {
+    return this.conversations.get(conversationId) ?? null;
+  }
+
+  async listConversations(userId: string): Promise<Conversation[]> {
+    return [...this.conversations.values()]
+      .filter((c) => c.participantIds.includes(userId))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async addMessage(message: ChatMessage): Promise<ChatMessage> {
+    const list = this.messages.get(message.conversationId) ?? [];
+    list.push(message);
+    this.messages.set(message.conversationId, list);
+    return message;
+  }
+
+  async getMessages(conversationId: string): Promise<ChatMessage[]> {
+    return [...(this.messages.get(conversationId) ?? [])];
+  }
+}
+
 export function createMemoryRepositories(): Repositories {
   return {
     users: new MemoryUserRepository(),
@@ -120,5 +172,6 @@ export function createMemoryRepositories(): Repositories {
     profiles: new MemoryProfileRepository(),
     matches: new MemoryMatchRepository(),
     advice: new MemoryAdviceRepository(),
+    chat: new MemoryChatRepository(),
   };
 }

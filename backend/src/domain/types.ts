@@ -69,6 +69,40 @@ export interface AdviceArticle {
   minorSafe: boolean;
 }
 
+export interface Conversation {
+  id: string;
+  participantIds: string[];
+  createdAt: string;
+}
+
+export type MessageKind = 'text' | 'photo' | 'voice';
+export type ModerationCategory =
+  | 'none'
+  | 'financial_scam'
+  | 'contact_exfiltration'
+  | 'harassment';
+
+/**
+ * Result of scanning a message before it is stored (Phase 10: server-side AI
+ * moderation runs at the point of send, before content is sealed at rest).
+ */
+export interface ModerationResult {
+  flagged: boolean;
+  category: ModerationCategory;
+  /** User-facing safety-banner copy, shown contextually next to the message. */
+  reason: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  kind: MessageKind;
+  body: string; // content_encrypted at rest in production
+  moderation: ModerationResult;
+  createdAt: string;
+}
+
 /** Public shape of a user — never leaks the password hash. */
 export type PublicUser = Omit<User, 'passwordHash'>;
 

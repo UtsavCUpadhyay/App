@@ -1,5 +1,7 @@
 import type {
   AdviceArticle,
+  ChatMessage,
+  Conversation,
   Match,
   Profile,
   User,
@@ -38,10 +40,20 @@ export interface AdviceRepository {
   list(opts: { audience?: string; minorSafeOnly: boolean }): Promise<AdviceArticle[]>;
 }
 
+export interface ChatRepository {
+  /** Returns the existing 1:1 conversation between the two users, or creates it. */
+  findOrCreateConversation(userA: string, userB: string): Promise<Conversation>;
+  getConversation(conversationId: string): Promise<Conversation | null>;
+  listConversations(userId: string): Promise<Conversation[]>;
+  addMessage(message: ChatMessage): Promise<ChatMessage>;
+  getMessages(conversationId: string): Promise<ChatMessage[]>;
+}
+
 export interface Repositories {
   users: UserRepository;
   verification: VerificationRepository;
   profiles: ProfileRepository;
   matches: MatchRepository;
   advice: AdviceRepository;
+  chat: ChatRepository;
 }
