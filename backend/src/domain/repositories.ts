@@ -1,9 +1,14 @@
 import type {
+  AdminUser,
   AdviceArticle,
+  AuditEntry,
+  Block,
   ChatMessage,
   Conversation,
   Match,
   Profile,
+  Report,
+  ReportStatus,
   User,
   VerificationRecord,
 } from './types.js';
@@ -49,6 +54,32 @@ export interface ChatRepository {
   getMessages(conversationId: string): Promise<ChatMessage[]>;
 }
 
+export interface AdminRepository {
+  create(admin: AdminUser): Promise<AdminUser>;
+  findByEmail(email: string): Promise<AdminUser | null>;
+  findById(id: string): Promise<AdminUser | null>;
+  count(): Promise<number>;
+}
+
+export interface ReportRepository {
+  create(report: Report): Promise<Report>;
+  get(id: string): Promise<Report | null>;
+  list(opts: { status?: ReportStatus }): Promise<Report[]>;
+  save(report: Report): Promise<Report>;
+}
+
+export interface BlockRepository {
+  create(block: Block): Promise<Block>;
+  remove(blockerId: string, blockedId: string): Promise<void>;
+  /** True if either user has blocked the other (bidirectional check). */
+  blockedBetween(a: string, b: string): Promise<boolean>;
+  listByBlocker(blockerId: string): Promise<Block[]>;
+}
+
+export interface AuditRepository {
+  append(entry: AuditEntry): Promise<void>;
+}
+
 export interface Repositories {
   users: UserRepository;
   verification: VerificationRepository;
@@ -56,4 +87,8 @@ export interface Repositories {
   matches: MatchRepository;
   advice: AdviceRepository;
   chat: ChatRepository;
+  admins: AdminRepository;
+  reports: ReportRepository;
+  blocks: BlockRepository;
+  audit: AuditRepository;
 }

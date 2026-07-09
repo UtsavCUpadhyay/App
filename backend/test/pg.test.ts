@@ -8,6 +8,7 @@ import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { createPgRepositories } from '../src/infra/pg/repositories.js';
 import { createPool, runMigrations, type Pool } from '../src/infra/pg/pool.js';
+import { AdminService } from '../src/modules/admin/admin.service.js';
 
 // Runs only when a database is available — keeps the default `npm test` green
 // in environments without Postgres.
@@ -24,12 +25,14 @@ d('Postgres-backed API', () => {
     await runMigrations(pool);
     // Reset to a clean slate, then seed the curation pool + advice content.
     await pool.query(
-      'TRUNCATE messages, conversation_participants, conversations, matches, verification_records, profiles, compatibility_answers, users, advice_articles RESTART IDENTITY CASCADE',
+      'TRUNCATE reports, blocks, admin_users, messages, conversation_participants, conversations, matches, verification_records, profiles, compatibility_answers, users, advice_articles RESTART IDENTITY CASCADE',
     );
     const seedPath = fileURLToPath(new URL('../migrations/seed.sql', import.meta.url));
     await pool.query(await readFile(seedPath, 'utf8'));
 
-    app = await buildApp({ config, repos: createPgRepositories(pool) });
+    const repos = createPgRepositories(pool);
+    await new AdminService(repos).createAdmin('pgmod@aurelle.app', 'admin-strong-pass', 'moderator');
+    app = await buildApp({ config, repos });
     await app.ready();
   });
 
@@ -142,5 +145,40 @@ d('Postgres-backed API', () => {
     const { rows } = await pool.query('SELECT moderation_flag, moderation_category FROM messages WHERE conversation_id = $1', [convoId]);
     expect(rows[0].moderation_flag).toBe(true);
     expect(rows[0].moderation_category).toBe('financial_scam');
+  });
+
+  it('persists a report through the queue to resolution in Postgres', async () => {
+    const reporter = await registerVerifiedAdult();
+    const offenderReg = await app.inject({
+      method: 'POST', url: '/auth/register',
+      payload: { email: `off-${Date.now()}@example.com`, password: 'a-strong-passphrase', dateOfBirth: '1990-01-01' },
+    });
+    const offenderId = offenderReg.json().user.id as string;
+
+    const reportId = (
+      await app.inject({
+        method: 'POST', url: '/reports', headers: { authorization: `Bearer ${reporter}` },
+        payload: { reportedUserId: offenderId, category: 'scam', reason: 'money request' },
+      })
+    ).json().report.id as string;
+
+    const adminToken = (
+      await app.inject({ method: 'POST', url: '/admin/auth/login', payload: { email: 'pgmod@aurelle.app', password: 'admin-strong-pass' } })
+    ).json().token as string;
+
+    await app.inject({
+      method: 'PATCH', url: `/admin/reports/${reportId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { status: 'resolved', notes: 'handled' },
+    });
+
+    const { rows } = await pool.query('SELECT status, assigned_admin_id, resolved_at FROM reports WHERE id = $1', [reportId]);
+    expect(rows[0].status).toBe('resolved');
+    expect(rows[0].assigned_admin_id).not.toBeNull();
+    expect(rows[0].resolved_at).not.toBeNull();
+
+    // The admin action was written to the append-only audit log.
+    const audit = await pool.query("SELECT action FROM audit_log WHERE target_id = $1 AND actor_type = 'admin'", [reportId]);
+    expect(audit.rows.map((r) => r.action)).toContain('report.resolved');
   });
 });

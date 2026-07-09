@@ -24,6 +24,9 @@ export class ChatService {
     }
     const other = await this.repos.users.findById(withUserId);
     if (!other) throw new HttpError(404, 'That member does not exist');
+    if (await this.repos.blocks.blockedBetween(userId, withUserId)) {
+      throw new HttpError(403, 'This conversation is unavailable');
+    }
     return this.repos.chat.findOrCreateConversation(userId, withUserId);
   }
 
@@ -37,13 +40,31 @@ export class ChatService {
     return this.repos.chat.getMessages(conversationId);
   }
 
+  private async assertParticipant(
+    userId: string,
+    conversationId: string,
+  ): Promise<Conversation> {
+    const convo = await this.repos.chat.getConversation(conversationId);
+    if (!convo) throw new HttpError(404, 'Conversation not found');
+    if (!convo.participantIds.includes(userId)) {
+      throw new HttpError(403, 'You are not a participant in this conversation');
+    }
+    return convo;
+  }
+
   async sendMessage(
     userId: string,
     conversationId: string,
     kind: MessageKind,
     body: string,
   ): Promise<ChatMessage> {
-    await this.assertParticipant(userId, conversationId);
+    const convo = await this.assertParticipant(userId, conversationId);
+
+    // A block silences the thread in both directions (Phase 12 Safety Center).
+    const other = convo.participantIds.find((id) => id !== userId);
+    if (other && (await this.repos.blocks.blockedBetween(userId, other))) {
+      throw new HttpError(403, 'This conversation is unavailable');
+    }
 
     // Only text is scanned for scam/abuse here; voice/photo moderation
     // (transcription, NCII/CSAM detection) is a separate pipeline (Roadmap S4).
@@ -60,13 +81,5 @@ export class ChatService {
       createdAt: new Date().toISOString(),
     };
     return this.repos.chat.addMessage(message);
-  }
-
-  private async assertParticipant(userId: string, conversationId: string): Promise<void> {
-    const convo = await this.repos.chat.getConversation(conversationId);
-    if (!convo) throw new HttpError(404, 'Conversation not found');
-    if (!convo.participantIds.includes(userId)) {
-      throw new HttpError(403, 'You are not a participant in this conversation');
-    }
   }
 }

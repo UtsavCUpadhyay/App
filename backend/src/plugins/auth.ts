@@ -50,4 +50,24 @@ export async function registerAuth(
       }
     },
   );
+
+  app.decorateRequest('adminId', '');
+  app.decorateRequest('adminRole', '');
+
+  // Admin auth is a separate token type (`admin`) carrying an RBAC role claim.
+  app.decorate(
+    'requireAdmin',
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const payload = await request.jwtVerify<{ sub: string; typ: string; role: string }>();
+        if (payload.typ !== 'admin') {
+          return reply.code(403).send({ error: 'Admin access required' });
+        }
+        request.adminId = payload.sub;
+        request.adminRole = payload.role;
+      } catch {
+        return reply.code(401).send({ error: 'Authentication required' });
+      }
+    },
+  );
 }

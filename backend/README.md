@@ -50,6 +50,10 @@ with indexes on the hot query paths and Row-Level Security enabled as the enforc
   (Phase 10); scam/abuse patterns are flagged with a user-facing reason (the contextual safety
   banner) and still delivered — we flag, never auto-block. The rules-based provider is swappable for
   a hosted-LLM one (Phase 16) behind one interface.
+- **Report + block + moderation queue** — the safety loop store reviewers require. Members report or
+  block (blocks silence a thread both ways, enforced in chat). Reports flow into a human moderation
+  queue behind a **separate admin auth** (its own token type + RBAC roles). Every admin action is
+  written to an append-only **audit log** (Phase 10). `npm run create-admin` provisions an admin.
 
 ## Structure (module boundaries mirror the Phase 15 plan)
 
@@ -66,7 +70,9 @@ src/
 │   ├── matching/             # curated daily matches (gated)
 │   ├── advice/               # age-tiered content
 │   ├── chat/                 # conversations + messages (gated, moderated)
-│   └── moderation/           # scam/abuse scan provider (swappable for an LLM)
+│   ├── moderation/           # scam/abuse scan provider (swappable for an LLM)
+│   ├── safety/               # report + block (consumer Safety Center)
+│   └── admin/                # admin auth (RBAC) + moderation queue + audit
 ├── shared/http-error.ts
 ├── app.ts                    # composition root (buildApp)
 └── server.ts                 # process entry + graceful shutdown

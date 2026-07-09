@@ -5,11 +5,14 @@ import { loadConfig, type AppConfig } from './config.js';
 import type { Repositories } from './domain/repositories.js';
 import { createMemoryRepositories } from './infra/memory/store.js';
 import type { ModerationProvider } from './modules/moderation/moderation.service.js';
+import { registerAdminRoutes } from './modules/admin/admin.routes.js';
+import { ensureBootstrapAdmin } from './modules/admin/admin.service.js';
 import { registerAdviceRoutes } from './modules/advice/advice.routes.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { registerChatRoutes } from './modules/chat/chat.routes.js';
 import { registerMatchingRoutes } from './modules/matching/matching.routes.js';
 import { RulesModerationProvider } from './modules/moderation/moderation.service.js';
+import { registerSafetyRoutes } from './modules/safety/safety.routes.js';
 import { registerVerificationRoutes } from './modules/verification/verification.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { HttpError } from './shared/http-error.js';
@@ -57,11 +60,16 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // Swap this for a hosted-LLM provider (Phase 16) without touching chat.
   const moderation = opts.moderation ?? new RulesModerationProvider();
 
+  // Create the first superadmin from env if configured and none exists.
+  await ensureBootstrapAdmin(repos);
+
   registerAuthRoutes(app, repos, config);
   registerVerificationRoutes(app, repos);
   registerMatchingRoutes(app, repos);
   registerAdviceRoutes(app, repos);
   registerChatRoutes(app, repos, moderation);
+  registerSafetyRoutes(app, repos);
+  registerAdminRoutes(app, repos, config);
 
   return app;
 }

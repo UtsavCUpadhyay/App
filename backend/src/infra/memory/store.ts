@@ -1,20 +1,29 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  AdminRepository,
   AdviceRepository,
+  AuditRepository,
+  BlockRepository,
   ChatRepository,
   MatchRepository,
   ProfileRepository,
+  ReportRepository,
   Repositories,
   UserRepository,
   VerificationRepository,
 } from '../../domain/repositories.js';
 import type {
+  AdminUser,
   AdviceArticle,
+  AuditEntry,
+  Block,
   ChatMessage,
   Conversation,
   Match,
   Profile,
+  Report,
+  ReportStatus,
   User,
   VerificationRecord,
 } from '../../domain/types.js';
@@ -165,6 +174,75 @@ class MemoryChatRepository implements ChatRepository {
   }
 }
 
+class MemoryAdminRepository implements AdminRepository {
+  private byId = new Map<string, AdminUser>();
+  private byEmail = new Map<string, string>();
+
+  async create(admin: AdminUser): Promise<AdminUser> {
+    this.byId.set(admin.id, admin);
+    this.byEmail.set(admin.email.toLowerCase(), admin.id);
+    return admin;
+  }
+  async findByEmail(email: string): Promise<AdminUser | null> {
+    const id = this.byEmail.get(email.toLowerCase());
+    return id ? (this.byId.get(id) ?? null) : null;
+  }
+  async findById(id: string): Promise<AdminUser | null> {
+    return this.byId.get(id) ?? null;
+  }
+  async count(): Promise<number> {
+    return this.byId.size;
+  }
+}
+
+class MemoryReportRepository implements ReportRepository {
+  private reports = new Map<string, Report>();
+
+  async create(report: Report): Promise<Report> {
+    this.reports.set(report.id, report);
+    return report;
+  }
+  async get(id: string): Promise<Report | null> {
+    return this.reports.get(id) ?? null;
+  }
+  async list(opts: { status?: ReportStatus }): Promise<Report[]> {
+    return [...this.reports.values()]
+      .filter((r) => !opts.status || r.status === opts.status)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+  async save(report: Report): Promise<Report> {
+    this.reports.set(report.id, report);
+    return report;
+  }
+}
+
+class MemoryBlockRepository implements BlockRepository {
+  private blocks = new Map<string, Block>();
+  private key(a: string, b: string): string {
+    return `${a}:${b}`;
+  }
+  async create(block: Block): Promise<Block> {
+    this.blocks.set(this.key(block.blockerId, block.blockedId), block);
+    return block;
+  }
+  async remove(blockerId: string, blockedId: string): Promise<void> {
+    this.blocks.delete(this.key(blockerId, blockedId));
+  }
+  async blockedBetween(a: string, b: string): Promise<boolean> {
+    return this.blocks.has(this.key(a, b)) || this.blocks.has(this.key(b, a));
+  }
+  async listByBlocker(blockerId: string): Promise<Block[]> {
+    return [...this.blocks.values()].filter((b) => b.blockerId === blockerId);
+  }
+}
+
+class MemoryAuditRepository implements AuditRepository {
+  readonly entries: (AuditEntry & { createdAt: string })[] = [];
+  async append(entry: AuditEntry): Promise<void> {
+    this.entries.push({ ...entry, createdAt: new Date().toISOString() });
+  }
+}
+
 export function createMemoryRepositories(): Repositories {
   return {
     users: new MemoryUserRepository(),
@@ -173,5 +251,9 @@ export function createMemoryRepositories(): Repositories {
     matches: new MemoryMatchRepository(),
     advice: new MemoryAdviceRepository(),
     chat: new MemoryChatRepository(),
+    admins: new MemoryAdminRepository(),
+    reports: new MemoryReportRepository(),
+    blocks: new MemoryBlockRepository(),
+    audit: new MemoryAuditRepository(),
   };
 }

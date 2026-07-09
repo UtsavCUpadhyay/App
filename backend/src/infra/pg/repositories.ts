@@ -1,19 +1,29 @@
 import type {
+  AdminRepository,
   AdviceRepository,
+  AuditRepository,
+  BlockRepository,
   ChatRepository,
   MatchRepository,
   ProfileRepository,
+  ReportRepository,
   Repositories,
   UserRepository,
   VerificationRepository,
 } from '../../domain/repositories.js';
 import type {
+  AdminUser,
   AdviceArticle,
+  AuditEntry,
+  Block,
   ChatMessage,
   Conversation,
   Match,
   ModerationCategory,
   Profile,
+  Report,
+  ReportCategory,
+  ReportStatus,
   User,
   VerificationRecord,
 } from '../../domain/types.js';
@@ -358,6 +368,141 @@ class PgChatRepository implements ChatRepository {
   }
 }
 
+class PgAdminRepository implements AdminRepository {
+  constructor(private readonly pool: Pool) {}
+
+  private map(r: Record<string, unknown>): AdminUser {
+    return {
+      id: r.id as string,
+      email: r.email as string,
+      passwordHash: r.password_hash as string,
+      role: r.role as AdminUser['role'],
+      mfaEnabled: r.mfa_enabled as boolean,
+      createdAt: isoDate(r.created_at as Date | string),
+    };
+  }
+
+  async create(admin: AdminUser): Promise<AdminUser> {
+    await this.pool.query(
+      `INSERT INTO admin_users (id, email, password_hash, role, mfa_enabled, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [admin.id, admin.email, admin.passwordHash, admin.role, admin.mfaEnabled, admin.createdAt],
+    );
+    return admin;
+  }
+  async findByEmail(email: string): Promise<AdminUser | null> {
+    const { rows } = await this.pool.query('SELECT * FROM admin_users WHERE email = $1', [
+      email.toLowerCase(),
+    ]);
+    return rows[0] ? this.map(rows[0]) : null;
+  }
+  async findById(id: string): Promise<AdminUser | null> {
+    const { rows } = await this.pool.query('SELECT * FROM admin_users WHERE id = $1', [id]);
+    return rows[0] ? this.map(rows[0]) : null;
+  }
+  async count(): Promise<number> {
+    const { rows } = await this.pool.query<{ n: string }>('SELECT COUNT(*)::text AS n FROM admin_users');
+    return Number(rows[0]!.n);
+  }
+}
+
+class PgReportRepository implements ReportRepository {
+  constructor(private readonly pool: Pool) {}
+
+  private map(r: Record<string, unknown>): Report {
+    return {
+      id: r.id as string,
+      reporterId: r.reporter_id as string,
+      reportedUserId: r.reported_user_id as string,
+      conversationId: (r.conversation_id as string | null) ?? null,
+      category: r.category as ReportCategory,
+      reason: r.reason as string,
+      status: r.status as ReportStatus,
+      assignedAdminId: (r.assigned_admin_id as string | null) ?? null,
+      resolutionNotes: (r.resolution_notes as string | null) ?? null,
+      createdAt: isoDate(r.created_at as Date | string),
+      resolvedAt: r.resolved_at ? isoDate(r.resolved_at as Date | string) : null,
+    };
+  }
+
+  async create(report: Report): Promise<Report> {
+    await this.pool.query(
+      `INSERT INTO reports
+         (id, reporter_id, reported_user_id, conversation_id, category, reason, status, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [report.id, report.reporterId, report.reportedUserId, report.conversationId,
+        report.category, report.reason, report.status, report.createdAt],
+    );
+    return report;
+  }
+  async get(id: string): Promise<Report | null> {
+    const { rows } = await this.pool.query('SELECT * FROM reports WHERE id = $1', [id]);
+    return rows[0] ? this.map(rows[0]) : null;
+  }
+  async list(opts: { status?: ReportStatus }): Promise<Report[]> {
+    const { rows } = opts.status
+      ? await this.pool.query('SELECT * FROM reports WHERE status = $1 ORDER BY created_at ASC', [opts.status])
+      : await this.pool.query('SELECT * FROM reports ORDER BY created_at ASC');
+    return rows.map((r) => this.map(r));
+  }
+  async save(report: Report): Promise<Report> {
+    await this.pool.query(
+      `UPDATE reports SET status=$2, assigned_admin_id=$3, resolution_notes=$4, resolved_at=$5
+       WHERE id=$1`,
+      [report.id, report.status, report.assignedAdminId, report.resolutionNotes, report.resolvedAt],
+    );
+    return report;
+  }
+}
+
+class PgBlockRepository implements BlockRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async create(block: Block): Promise<Block> {
+    await this.pool.query(
+      `INSERT INTO blocks (blocker_id, blocked_id, created_at) VALUES ($1,$2,$3)
+       ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
+      [block.blockerId, block.blockedId, block.createdAt],
+    );
+    return block;
+  }
+  async remove(blockerId: string, blockedId: string): Promise<void> {
+    await this.pool.query('DELETE FROM blocks WHERE blocker_id = $1 AND blocked_id = $2', [
+      blockerId, blockedId,
+    ]);
+  }
+  async blockedBetween(a: string, b: string): Promise<boolean> {
+    const { rows } = await this.pool.query(
+      `SELECT 1 FROM blocks
+       WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)
+       LIMIT 1`,
+      [a, b],
+    );
+    return rows.length > 0;
+  }
+  async listByBlocker(blockerId: string): Promise<Block[]> {
+    const { rows } = await this.pool.query(
+      'SELECT * FROM blocks WHERE blocker_id = $1 ORDER BY created_at DESC',
+      [blockerId],
+    );
+    return rows.map((r) => ({
+      blockerId: r.blocker_id,
+      blockedId: r.blocked_id,
+      createdAt: isoDate(r.created_at),
+    }));
+  }
+}
+
+class PgAuditRepository implements AuditRepository {
+  constructor(private readonly pool: Pool) {}
+  async append(entry: AuditEntry): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO audit_log (actor_id, actor_type, action, target_id) VALUES ($1,$2,$3,$4)`,
+      [entry.actorId, entry.actorType, entry.action, entry.targetId],
+    );
+  }
+}
+
 export function createPgRepositories(pool: Pool): Repositories {
   return {
     users: new PgUserRepository(pool),
@@ -366,5 +511,9 @@ export function createPgRepositories(pool: Pool): Repositories {
     matches: new PgMatchRepository(pool),
     advice: new PgAdviceRepository(pool),
     chat: new PgChatRepository(pool),
+    admins: new PgAdminRepository(pool),
+    reports: new PgReportRepository(pool),
+    blocks: new PgBlockRepository(pool),
+    audit: new PgAuditRepository(pool),
   };
 }

@@ -38,9 +38,12 @@ team-weeks, not guarantees.
   and participant-authorized; **server-side scam/abuse moderation _before_ storage** with a swappable
   provider (rules now → hosted LLM per Phase 16), flag-not-block, contextual safety-banner reason
   persisted per message. Verified live over HTTP + at the SQL layer (7 chat/moderation tests).
+- ✅ **Report + block + moderation queue:** consumer report/block (blocks enforced bidirectionally in
+  chat), a human moderation queue behind separate admin auth + RBAC roles, and an append-only audit
+  log for every admin action (Phase 10). 38 tests pass (safety flows incl. 5 against real Postgres).
 - Next: WebSocket gateway + Redis pub/sub for real-time delivery (< 500ms p95); encrypt-at-rest;
   image NCII/CSAM detection before enabling photo messaging; voice-note transcription+scan or descope
-  voice; report/block wired to the admin moderation queue with the < 24h (urgent < 2h) SLA.
+  voice; admin MFA (mandatory in prod); the < 24h (urgent < 2h) resolution SLA + notifications.
 
 ## Stage 5 — Advice + AI + billing (3–5 wks)
 - Advice CMS + content; guardrailed AI Coach (hosted LLM, no-training terms) with **Australian**

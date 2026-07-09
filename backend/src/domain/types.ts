@@ -103,10 +103,68 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export type AdminRole =
+  | 'verification_reviewer'
+  | 'moderator'
+  | 'support'
+  | 'superadmin';
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  role: AdminRole;
+  mfaEnabled: boolean;
+  createdAt: string;
+}
+
+export type ReportStatus = 'open' | 'reviewing' | 'resolved' | 'dismissed';
+export type ReportCategory =
+  | 'scam'
+  | 'harassment'
+  | 'fake_profile'
+  | 'inappropriate'
+  | 'other';
+
+export interface Report {
+  id: string;
+  reporterId: string;
+  reportedUserId: string;
+  conversationId: string | null;
+  category: ReportCategory;
+  reason: string;
+  status: ReportStatus;
+  assignedAdminId: string | null;
+  resolutionNotes: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface Block {
+  blockerId: string;
+  blockedId: string;
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  actorId: string | null;
+  actorType: 'user' | 'admin' | 'system';
+  action: string;
+  targetId: string | null;
+}
+
 /** Public shape of a user — never leaks the password hash. */
 export type PublicUser = Omit<User, 'passwordHash'>;
 
 export function toPublicUser(user: User): PublicUser {
   const { passwordHash: _ignored, ...rest } = user;
+  return rest;
+}
+
+/** Public shape of an admin — never leaks the password hash. */
+export type PublicAdmin = Omit<AdminUser, 'passwordHash'>;
+
+export function toPublicAdmin(admin: AdminUser): PublicAdmin {
+  const { passwordHash: _ignored, ...rest } = admin;
   return rest;
 }
