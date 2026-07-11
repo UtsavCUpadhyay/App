@@ -29,9 +29,15 @@ team-weeks, not guarantees.
   dependency/vuln scanning in CI; move curation out of the match repo into a real scoring service.
 
 ## Stage 3 — Verification + trust (3–4 wks)
-- Integrate a licensed vendor (Onfido/Jumio/iDenfy/Persona-class) — store reference tokens only.
-- Duplicate-face + device-fingerprint + velocity checks (Phase 10 defense-in-depth layers 1–3).
-- Admin verification/moderation queue (separate web app — never in the mobile binary).
+- ✅ **Stripe Identity integrated:** `/verification/session` opens a real Stripe VerificationSession;
+  the signature-verified webhook applies the outcome (verified→approved, requires_input→manual
+  review, canceled→rejected). Stores only the session reference token — never documents. Webhook
+  signature verification implemented to Stripe's HMAC scheme with replay protection and unit-tested;
+  full flow verified live over HTTP against Postgres. Provider is swappable; simulation backs dev.
+- ✅ **Admin moderation queue** delivered in Stage 4 work (separate admin auth + RBAC + audit).
+- Next: connect Stripe keys + register the webhook endpoint in the Stripe dashboard; duplicate-face +
+  device-fingerprint + velocity checks (Phase 10 defense-in-depth layers 1–3); the standalone admin
+  web app.
 
 ## Stage 4 — Messaging + safety (4–6 wks)
 - ✅ **Started:** 1:1 conversations + messages (Phase 8 `0002_chat.sql`), gated to verified members

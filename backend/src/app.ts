@@ -13,6 +13,10 @@ import { registerChatRoutes } from './modules/chat/chat.routes.js';
 import { registerMatchingRoutes } from './modules/matching/matching.routes.js';
 import { RulesModerationProvider } from './modules/moderation/moderation.service.js';
 import { registerSafetyRoutes } from './modules/safety/safety.routes.js';
+import {
+  buildVerificationProvider,
+  type VerificationProvider,
+} from './modules/verification/provider.js';
 import { registerVerificationRoutes } from './modules/verification/verification.routes.js';
 import { registerAuth } from './plugins/auth.js';
 import { HttpError } from './shared/http-error.js';
@@ -21,6 +25,7 @@ export interface BuildOptions {
   config?: AppConfig;
   repos?: Repositories;
   moderation?: ModerationProvider;
+  verificationProvider?: VerificationProvider;
 }
 
 /**
@@ -37,6 +42,22 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     logger: { level: process.env.LOG_LEVEL ?? 'info' },
     disableRequestLogging: process.env.NODE_ENV === 'test',
   });
+
+  // Retain the raw JSON body so the Stripe webhook can verify its signature
+  // against the exact bytes Stripe signed, while normal routes still get parsed
+  // JSON.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (request, body, done) => {
+      (request as { rawBody?: string }).rawBody = body as string;
+      try {
+        done(null, (body as string).length ? JSON.parse(body as string) : {});
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
 
   // Uniform error handling: Zod → 400, HttpError → its status, else 500.
   app.setErrorHandler((error, _request, reply) => {
@@ -63,8 +84,16 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
   // Create the first superadmin from env if configured and none exists.
   await ensureBootstrapAdmin(repos);
 
+  // Identity verification provider (Stripe Identity when keys are present).
+  const verificationProvider =
+    opts.verificationProvider ??
+    buildVerificationProvider({
+      provider: config.verification.provider,
+      stripeSecretKey: config.verification.stripeSecretKey,
+    });
+
   registerAuthRoutes(app, repos, config);
-  registerVerificationRoutes(app, repos);
+  registerVerificationRoutes(app, repos, config, verificationProvider);
   registerMatchingRoutes(app, repos);
   registerAdviceRoutes(app, repos);
   registerChatRoutes(app, repos, moderation);

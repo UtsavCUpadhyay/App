@@ -40,9 +40,13 @@ with indexes on the hot query paths and Row-Level Security enabled as the enforc
 - **Hard verification gate** — the founder's chosen "verify before browsing" policy, enforced
   **server-side**: `/matches/today` sits behind `authenticate` + `requireVerified`, so an unverified
   account gets `403 verification_required` even if the client is bypassed.
-- **Verification** — simulates the licensed-vendor callback (Phase 10): stores only a vendor
-  reference token + liveness score (never raw ID docs); high score auto-approves, middling score
-  routes to **manual review** rather than auto-rejecting.
+- **Identity verification (Stripe Identity)** — `POST /verification/session` opens a Stripe
+  VerificationSession (the app completes it in Stripe's SDK); the result arrives via the
+  signature-verified `POST /verification/webhook`. We persist **only** Stripe's session id — the ID
+  document itself is held by Stripe (data-minimization, Phase 10). `verified` auto-approves;
+  `requires_input` routes to manual review; `canceled` rejects. A `SimulationVerificationProvider`
+  (+ dev-only `/verification/submit`) backs local runs when no Stripe key is set. Webhook signatures
+  are checked to Stripe's exact HMAC scheme with replay protection (`stripe_signature.ts`).
 - **Advice** — age-tiered server-side: under-18 accounts only ever receive minor-safe content
   (Phase 16), not just a hidden UI filter.
 - **Chat + AI safety moderation** — 1:1 conversations + messages (gated: verified members only,

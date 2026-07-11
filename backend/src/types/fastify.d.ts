@@ -12,5 +12,7 @@ declare module 'fastify' {
     /** Set by the `requireAdmin` guard. */
     adminId: string;
     adminRole: string;
+    /** Raw JSON body, retained for Stripe webhook signature verification. */
+    rawBody?: string;
   }
 }

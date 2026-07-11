@@ -13,6 +13,12 @@ export interface AppConfig {
   minDatingAge: number;
   /** Postgres connection string. When unset, the app uses in-memory storage. */
   databaseUrl: string | undefined;
+  /** Identity-verification provider. 'stripe' when Stripe keys are present. */
+  verification: {
+    provider: 'simulation' | 'stripe';
+    stripeSecretKey: string | undefined;
+    stripeWebhookSecret: string | undefined;
+  };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -28,5 +34,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     refreshTokenTtl: env.REFRESH_TOKEN_TTL ?? '30d',
     minDatingAge: 18,
     databaseUrl: env.DATABASE_URL,
+    verification: {
+      provider: env.STRIPE_SECRET_KEY ? 'stripe' : 'simulation',
+      stripeSecretKey: env.STRIPE_SECRET_KEY,
+      stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    },
   };
 }
